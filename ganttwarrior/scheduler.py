@@ -34,17 +34,20 @@ class Scheduler:
                     self._predecessors[task.id].append(dep.predecessor_id)
 
     def _detect_cycles(self) -> list[str]:
-        """Detect circular dependencies using DFS. Returns cycle path if found."""
+        """Detect circular dependencies using DFS. Returns the cycle segment if found."""
         WHITE, GRAY, BLACK = 0, 1, 2
         color = {tid: WHITE for tid in self._task_map}
         path: list[str] = []
+        cycle: list[str] = []
 
         def dfs(node: str) -> bool:
+            nonlocal cycle
             color[node] = GRAY
             path.append(node)
             for succ in self._successors.get(node, []):
                 if color[succ] == GRAY:
                     cycle_start = path.index(succ)
+                    cycle = path[cycle_start:] + [succ]
                     return True
                 if color[succ] == WHITE and dfs(succ):
                     return True
@@ -55,7 +58,7 @@ class Scheduler:
         for tid in self._task_map:
             if color[tid] == WHITE:
                 if dfs(tid):
-                    return path
+                    return cycle
         return []
 
     def _topological_sort(self) -> list[str]:

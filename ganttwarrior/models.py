@@ -237,15 +237,28 @@ class Project:
             t.dependencies = [d for d in t.dependencies if d.predecessor_id != task_id]
 
     def update_blocked_status(self) -> None:
-        """Mark tasks as blocked if their dependencies aren't complete."""
+        """Mark tasks as blocked if their dependencies aren't complete.
+
+        Blocking rules by dependency type:
+        - FS (Finish-to-Start): predecessor must be COMPLETED before successor can start.
+        - SS (Start-to-Start): predecessor must have started (IN_PROGRESS or COMPLETED).
+        - FF (Finish-to-Finish): predecessor must be COMPLETED before successor can finish.
+        - SF (Start-to-Finish): predecessor must have started (IN_PROGRESS or COMPLETED).
+        """
         for task in self.tasks:
             if task.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
                 continue
             blocked = False
             for dep in task.dependencies:
                 pred = self.get_task(dep.predecessor_id)
-                if pred and dep.dependency_type == DependencyType.FINISH_TO_START:
+                if not pred:
+                    continue
+                if dep.dependency_type in (DependencyType.FINISH_TO_START, DependencyType.FINISH_TO_FINISH):
                     if pred.status != TaskStatus.COMPLETED:
+                        blocked = True
+                        break
+                elif dep.dependency_type in (DependencyType.START_TO_START, DependencyType.START_TO_FINISH):
+                    if pred.status not in (TaskStatus.IN_PROGRESS, TaskStatus.COMPLETED):
                         blocked = True
                         break
             if blocked and task.status != TaskStatus.IN_PROGRESS:
