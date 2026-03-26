@@ -120,8 +120,14 @@ class Task:
         return self.parent_wbs == "" and self.wbs_level == 1
 
     def compute_end_date(self) -> None:
-        if self.start_date and self.duration_days:
-            self.end_date = self.start_date + timedelta(days=max(self.duration_days - 1, 0))
+        # Compute end_date based on start_date and duration_days.
+        # Treat 0-day duration (milestones) as ending on the start_date.
+        if self.start_date is not None and self.duration_days is not None:
+            if self.duration_days <= 0:
+                # Milestone or explicitly zero/negative duration: same-day end.
+                self.end_date = self.start_date
+            else:
+                self.end_date = self.start_date + timedelta(days=self.duration_days - 1)
 
     def to_dict(self) -> dict:
         return {
