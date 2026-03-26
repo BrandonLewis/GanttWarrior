@@ -208,17 +208,20 @@ def export_pdf(project: Project, path: str) -> str:
             label_w = 70
             chart_w = min(300, total_days * 2)
             day_w = chart_w / max(total_days, 1)
-            y_start = pdf.get_y() + 5
+            row_height = 5
+            y_start = pdf.get_y() + row_height
+            current_y = y_start
 
             pdf.set_font("Helvetica", "", 6)
 
-            for i, task in enumerate(tasks):
-                y = y_start + i * 5
-                if y > pdf.h - 20:
+            for task in tasks:
+                # Start a new page if we've reached the bottom margin
+                if current_y > pdf.h - 20:
                     pdf.add_page()
                     y_start = 20
-                    y = y_start + i * 5
+                    current_y = y_start
 
+                y = current_y
                 # Task label
                 pdf.set_xy(10, y)
                 label = f"{task.wbs} {task.name}"
