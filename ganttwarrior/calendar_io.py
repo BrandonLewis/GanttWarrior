@@ -32,7 +32,7 @@ def export_ical(project: Project, path: str) -> str:
             # iCal DTEND is exclusive for DATE values
             event.add("dtend", vDate(task.end_date + timedelta(days=1)))
 
-        if task.duration_days:
+        if task.duration_days and not task.end_date:
             event.add("duration", timedelta(days=task.duration_days))
 
         # Store metadata in custom properties
