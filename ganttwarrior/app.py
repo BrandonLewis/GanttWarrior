@@ -613,7 +613,6 @@ class GanttWarriorApp(App):
         self.push_screen(DependencyScreen(self.project, task.id), on_result)
 
     def action_reschedule(self) -> None:
-        self._run_scheduler()
         self._refresh_views()
         self.notify("Project rescheduled")
 
