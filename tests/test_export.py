@@ -48,7 +48,7 @@ class TestExport:
     def test_export_pdf(self):
         try:
             from fpdf import FPDF  # noqa: F401
-        except BaseException:
+        except ImportError:
             pytest.skip("fpdf2/cryptography unavailable in this environment")
 
         project = self._make_project()
