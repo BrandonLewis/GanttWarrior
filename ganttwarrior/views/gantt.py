@@ -170,12 +170,6 @@ class GanttHeader(Static):
         current = self.chart_start
         while current <= self.chart_end:
             month_name = current.strftime("%b %Y")
-            days_in_view = min(
-                (self.chart_end - current).days + 1,
-                (date(current.year, current.month + 1, 1) if current.month < 12
-                 else date(current.year + 1, 1, 1)) - current
-            ).days if hasattr((date(current.year, current.month + 1, 1) if current.month < 12
-                              else date(current.year + 1, 1, 1)) - current, 'days') else 30
             # Simpler: just count remaining days in this month
             if current.month < 12:
                 next_month = date(current.year, current.month + 1, 1)
