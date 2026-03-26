@@ -51,16 +51,16 @@ class KanbanCard(Widget):
     class Selected(Message):
         def __init__(self, task: Task) -> None:
             super().__init__()
-            self.task = task
+            self.gantt_task = task
 
     def __init__(self, task: Task, **kwargs):
         super().__init__(**kwargs)
-        self.task = task
+        self.gantt_task = task
         if task.is_critical:
             self.add_class("critical")
 
     def render(self) -> Text:
-        task = self.task
+        task = self.gantt_task
         color = COLOR_MAP.get(task.color, "white")
         text = Text()
 
@@ -84,7 +84,7 @@ class KanbanCard(Widget):
         return text
 
     def on_click(self) -> None:
-        self.post_message(self.Selected(self.task))
+        self.post_message(self.Selected(self.gantt_task))
 
 
 class KanbanColumn(Vertical):

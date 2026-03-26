@@ -8,7 +8,7 @@ from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Container, Horizontal, Vertical
+from textual.containers import Container, Horizontal, ScrollableContainer, Vertical
 from textual.screen import ModalScreen
 from textual.widgets import (
     Button,
@@ -46,11 +46,13 @@ class TaskEditScreen(ModalScreen[Optional[Task]]):
     }
     #task-edit-dialog {
         width: 70;
-        height: auto;
-        max-height: 38;
+        height: 90%;
         padding: 1 2;
         border: thick $accent;
         background: $surface;
+    }
+    #task-edit-form {
+        height: 1fr;
     }
     #task-edit-dialog Label {
         margin: 1 0 0 0;
@@ -60,8 +62,10 @@ class TaskEditScreen(ModalScreen[Optional[Task]]):
     }
     #task-edit-buttons {
         margin-top: 1;
-        height: 3;
+        height: auto;
+        min-height: 3;
         align: center middle;
+        dock: bottom;
     }
     #task-edit-buttons Button {
         margin: 0 2;
@@ -74,55 +78,56 @@ class TaskEditScreen(ModalScreen[Optional[Task]]):
 
     def __init__(self, task: Optional[Task] = None, project: Optional[Project] = None):
         super().__init__()
-        self.task = task
+        self.gantt_task = task
         self.project = project
         self.is_edit = task is not None
 
     def compose(self) -> ComposeResult:
-        task = self.task or Task()
+        task = self.gantt_task or Task()
         title = "Edit Task" if self.is_edit else "Add Task"
 
         with Vertical(id="task-edit-dialog"):
             yield Label(f"[bold]{title}[/bold]")
 
-            yield Label("Name:")
-            yield Input(value=task.name, id="task-name", placeholder="Task name")
+            with ScrollableContainer(id="task-edit-form"):
+                yield Label("Name:")
+                yield Input(value=task.name, id="task-name", placeholder="Task name")
 
-            yield Label("WBS (e.g. 1.2.3):")
-            yield Input(value=task.wbs, id="task-wbs", placeholder="Auto-assigned if empty")
+                yield Label("WBS (e.g. 1.2.3):")
+                yield Input(value=task.wbs, id="task-wbs", placeholder="Auto-assigned if empty")
 
-            yield Label("Duration (days):")
-            yield Input(value=str(task.duration_days), id="task-duration", placeholder="1")
+                yield Label("Duration (days):")
+                yield Input(value=str(task.duration_days), id="task-duration", placeholder="1")
 
-            yield Label("Start Date (YYYY-MM-DD):")
-            yield Input(
-                value=task.start_date.isoformat() if task.start_date else "",
-                id="task-start",
-                placeholder="YYYY-MM-DD",
-            )
+                yield Label("Start Date (YYYY-MM-DD):")
+                yield Input(
+                    value=task.start_date.isoformat() if task.start_date else "",
+                    id="task-start",
+                    placeholder="YYYY-MM-DD",
+                )
 
-            yield Label("Assigned To:")
-            yield Input(value=task.assigned_to, id="task-assigned", placeholder="Person name")
+                yield Label("Assigned To:")
+                yield Input(value=task.assigned_to, id="task-assigned", placeholder="Person name")
 
-            yield Label("Description:")
-            yield Input(value=task.description, id="task-desc", placeholder="Task description")
+                yield Label("Description:")
+                yield Input(value=task.description, id="task-desc", placeholder="Task description")
 
-            yield Label("Color:")
-            yield Select(
-                [(c.value, c.value) for c in TaskColor],
-                value=task.color.value,
-                id="task-color",
-            )
+                yield Label("Color:")
+                yield Select(
+                    [(c.value, c.value) for c in TaskColor],
+                    value=task.color.value,
+                    id="task-color",
+                )
 
-            yield Label("Status:")
-            yield Select(
-                [(s.value, s.value) for s in TaskStatus],
-                value=task.status.value,
-                id="task-status",
-            )
+                yield Label("Status:")
+                yield Select(
+                    [(s.value, s.value) for s in TaskStatus],
+                    value=task.status.value,
+                    id="task-status",
+                )
 
-            yield Label("Priority (0-9):")
-            yield Input(value=str(task.priority), id="task-priority", placeholder="0")
+                yield Label("Priority (0-9):")
+                yield Input(value=str(task.priority), id="task-priority", placeholder="0")
 
             with Horizontal(id="task-edit-buttons"):
                 yield Button("Save", variant="primary", id="save-btn")
@@ -140,7 +145,7 @@ class TaskEditScreen(ModalScreen[Optional[Task]]):
             self.notify("Task name is required", severity="error")
             return
 
-        task = self.task or Task()
+        task = self.gantt_task or Task()
         task.name = name
         task.wbs = self.query_one("#task-wbs", Input).value.strip()
         task.description = self.query_one("#task-desc", Input).value.strip()
@@ -542,10 +547,10 @@ class GanttWarriorApp(App):
         panel.update(info)
 
     def on_gantt_task_row_selected(self, event) -> None:
-        self._update_task_info(event.task)
+        self._update_task_info(event.gantt_task)
 
     def on_kanban_card_selected(self, event) -> None:
-        self._update_task_info(event.task)
+        self._update_task_info(event.gantt_task)
 
     def action_add_task(self) -> None:
         def on_result(task: Optional[Task]) -> None:

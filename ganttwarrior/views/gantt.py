@@ -59,7 +59,7 @@ class GanttTaskRow(Widget):
     class Selected(Message):
         def __init__(self, task: Task) -> None:
             super().__init__()
-            self.task = task
+            self.gantt_task = task
 
     def __init__(
         self,
@@ -71,7 +71,7 @@ class GanttTaskRow(Widget):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.task = task
+        self.gantt_task = task
         self.chart_start = chart_start
         self.chart_end = chart_end
         self.day_width = day_width
@@ -80,7 +80,7 @@ class GanttTaskRow(Widget):
             self.add_class("critical")
 
     def render(self) -> Text:
-        task = self.task
+        task = self.gantt_task
         total_days = (self.chart_end - self.chart_start).days + 1
         chart_width = total_days * self.day_width
 
@@ -133,7 +133,7 @@ class GanttTaskRow(Widget):
 
     def on_click(self) -> None:
         self.add_class("selected")
-        self.post_message(self.Selected(self.task))
+        self.post_message(self.Selected(self.gantt_task))
 
 
 class GanttHeader(Static):
@@ -262,7 +262,7 @@ class GanttChart(ScrollableContainer):
         for row in self._task_rows:
             row.remove_class("selected")
         for i, row in enumerate(self._task_rows):
-            if row.task.id == event.task.id:
+            if row.gantt_task.id == event.gantt_task.id:
                 row.add_class("selected")
                 self.selected_index = i
                 break
@@ -284,11 +284,11 @@ class GanttChart(ScrollableContainer):
     def action_select_task(self) -> None:
         if self._task_rows:
             row = self._task_rows[self.selected_index]
-            row.post_message(GanttTaskRow.Selected(row.task))
+            row.post_message(GanttTaskRow.Selected(row.gantt_task))
 
     def get_selected_task(self) -> Optional[Task]:
         if self._task_rows and 0 <= self.selected_index < len(self._task_rows):
-            return self._task_rows[self.selected_index].task
+            return self._task_rows[self.selected_index].gantt_task
         return None
 
     def refresh_chart(self) -> None:
