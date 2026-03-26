@@ -96,7 +96,13 @@ class Task:
     def wbs_parts(self) -> list[int]:
         if not self.wbs:
             return []
-        return [int(p) for p in self.wbs.split(".")]
+        try:
+            return [int(p) for p in self.wbs.split(".")]
+        except ValueError:
+            # Fallback for invalid WBS segments so core flows don't crash.
+            # This preserves behavior for valid numeric WBS strings while
+            # tolerating user-entered non-numeric values.
+            return []
 
     @property
     def wbs_level(self) -> int:
