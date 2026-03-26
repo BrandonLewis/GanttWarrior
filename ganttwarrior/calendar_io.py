@@ -103,10 +103,25 @@ def import_ical(path: str, project: Optional[Project] = None) -> Project:
             if end_date:
                 end_date = end_date - timedelta(days=1)
 
+        # Parse optional DURATION (used when DTEND is absent)
+        duration_prop = component.get("duration")
+        event_duration = None
+        if duration_prop is not None:
+            dur_value = getattr(duration_prop, "dt", duration_prop)
+            if isinstance(dur_value, timedelta):
+                event_duration = dur_value
+
         # Calculate duration
         duration_days = 1
         if start_date and end_date:
             duration_days = max((end_date - start_date).days + 1, 1)
+        elif start_date and event_duration:
+            # Convert timedelta to whole days, rounding up any partial day
+            total_days = event_duration.days
+            if event_duration.seconds or event_duration.microseconds:
+                total_days += 1
+            duration_days = max(total_days, 1)
+            end_date = start_date + timedelta(days=duration_days - 1)
 
         # Parse GanttWarrior-specific metadata
         wbs = str(component.get("x-gw-wbs", ""))
