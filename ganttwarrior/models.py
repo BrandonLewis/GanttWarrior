@@ -1,7 +1,5 @@
 """Data models for GanttWarrior: Tasks, Projects, WBS, and dependencies."""
 
-from __future__ import annotations
-
 import json
 import uuid
 from dataclasses import dataclass, field
@@ -66,15 +64,19 @@ class Dependency:
         )
 
 
+_DURATION_DEFAULT = object()  # sentinel to detect if duration_days was explicitly set
+
+
 @dataclass
-class Task:
+class _TaskBase:
+    """Internal base with backing fields. Use Task for the public API."""
     id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     name: str = ""
     wbs: str = ""  # e.g. "1.2.3"
     description: str = ""
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
-    duration_days: int = 1
+    _start_date: Optional[date] = None
+    _end_date: Optional[date] = None
+    _duration_days: int = 0
     status: TaskStatus = TaskStatus.NOT_STARTED
     color: TaskColor = TaskColor.BLUE
     progress: float = 0.0  # 0.0 to 1.0
@@ -84,6 +86,11 @@ class Task:
     is_milestone: bool = False
     parent_wbs: str = ""  # WBS of the parent summary task
 
+    # Work-days calendar fields
+    work_days: set[date] = field(default_factory=set)
+    work_weekdays: Optional[set[int]] = None
+    manually_edited: bool = False
+
     # Computed by scheduler
     early_start: Optional[date] = None
     early_finish: Optional[date] = None
@@ -91,6 +98,107 @@ class Task:
     late_finish: Optional[date] = None
     total_float: int = 0
     is_critical: bool = False
+
+
+class Task(_TaskBase):
+    """Task with dual-mode start_date/end_date/duration_days properties.
+
+    When work_days is non-empty, these compute from it. When empty, they
+    fall back to stored backing values for backward compatibility.
+    """
+
+    def __init__(
+        self,
+        id: str = None,
+        name: str = "",
+        wbs: str = "",
+        description: str = "",
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        duration_days=_DURATION_DEFAULT,
+        status: TaskStatus = TaskStatus.NOT_STARTED,
+        color: TaskColor = TaskColor.BLUE,
+        progress: float = 0.0,
+        dependencies: list[Dependency] = None,
+        assigned_to: str = "",
+        priority: int = 0,
+        is_milestone: bool = False,
+        parent_wbs: str = "",
+        work_days: set[date] = None,
+        work_weekdays: Optional[set[int]] = None,
+        manually_edited: bool = False,
+        early_start: Optional[date] = None,
+        early_finish: Optional[date] = None,
+        late_start: Optional[date] = None,
+        late_finish: Optional[date] = None,
+        total_float: int = 0,
+        is_critical: bool = False,
+    ):
+        # When duration_days is not explicitly passed, default to 0 (no work
+        # scheduled). Legacy callers that pass it explicitly get their value
+        # stored as-is, preserving backward compatibility.
+        if duration_days is _DURATION_DEFAULT:
+            dur = 0
+        else:
+            dur = duration_days
+        super().__init__(
+            id=id if id is not None else str(uuid.uuid4())[:8],
+            name=name,
+            wbs=wbs,
+            description=description,
+            _start_date=start_date,
+            _end_date=end_date,
+            _duration_days=dur,
+            status=status,
+            color=color,
+            progress=progress,
+            dependencies=dependencies if dependencies is not None else [],
+            assigned_to=assigned_to,
+            priority=priority,
+            is_milestone=is_milestone,
+            parent_wbs=parent_wbs,
+            work_days=work_days if work_days is not None else set(),
+            work_weekdays=work_weekdays,
+            manually_edited=manually_edited,
+            early_start=early_start,
+            early_finish=early_finish,
+            late_start=late_start,
+            late_finish=late_finish,
+            total_float=total_float,
+            is_critical=is_critical,
+        )
+
+    # --- Dual-mode properties ---
+
+    @property
+    def start_date(self) -> Optional[date]:
+        if self.work_days:
+            return min(self.work_days)
+        return self._start_date
+
+    @start_date.setter
+    def start_date(self, value: Optional[date]) -> None:
+        self._start_date = value
+
+    @property
+    def end_date(self) -> Optional[date]:
+        if self.work_days:
+            return max(self.work_days)
+        return self._end_date
+
+    @end_date.setter
+    def end_date(self, value: Optional[date]) -> None:
+        self._end_date = value
+
+    @property
+    def duration_days(self) -> int:
+        if self.work_days:
+            return len(self.work_days)
+        return self._duration_days
+
+    @duration_days.setter
+    def duration_days(self, value: int) -> None:
+        self._duration_days = value
 
     @property
     def wbs_parts(self) -> list[int]:
@@ -146,18 +254,25 @@ class Task:
             "priority": self.priority,
             "is_milestone": self.is_milestone,
             "parent_wbs": self.parent_wbs,
+            "work_days": sorted(d.isoformat() for d in self.work_days),
+            "work_weekdays": sorted(self.work_weekdays) if self.work_weekdays is not None else None,
+            "manually_edited": self.manually_edited,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "Task":
+        sd = date.fromisoformat(data["start_date"]) if data.get("start_date") else None
+        ed = date.fromisoformat(data["end_date"]) if data.get("end_date") else None
+        dur = data.get("duration_days", 1)
+
         task = cls(
             id=data["id"],
             name=data["name"],
             wbs=data.get("wbs", ""),
             description=data.get("description", ""),
-            start_date=date.fromisoformat(data["start_date"]) if data.get("start_date") else None,
-            end_date=date.fromisoformat(data["end_date"]) if data.get("end_date") else None,
-            duration_days=data.get("duration_days", 1),
+            start_date=sd,
+            end_date=ed,
+            duration_days=dur,
             status=TaskStatus(data.get("status", "not_started")),
             color=TaskColor(data.get("color", "blue")),
             progress=data.get("progress", 0.0),
@@ -167,6 +282,31 @@ class Task:
             is_milestone=data.get("is_milestone", False),
             parent_wbs=data.get("parent_wbs", ""),
         )
+
+        # Load work_days if present, otherwise migrate from legacy format
+        if "work_days" in data:
+            task.work_days = {date.fromisoformat(d) for d in data["work_days"]}
+        elif sd is not None and dur > 0:
+            # Legacy migration: expand start_date + duration_days into Mon-Fri work days
+            work_days: set[date] = set()
+            current = sd
+            added = 0
+            while added < dur:
+                if current.weekday() < 5:  # Mon-Fri
+                    work_days.add(current)
+                    added += 1
+                current += timedelta(days=1)
+            task.work_days = work_days
+
+        # Load work_weekdays
+        if data.get("work_weekdays") is not None:
+            task.work_weekdays = set(data["work_weekdays"])
+        else:
+            task.work_weekdays = None
+
+        # Load manually_edited
+        task.manually_edited = data.get("manually_edited", False)
+
         return task
 
 
@@ -178,6 +318,8 @@ class Project:
     start_date: Optional[date] = None
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     file_path: Optional[str] = None
+    default_work_weekdays: set[int] = field(default_factory=lambda: {0, 1, 2, 3, 4})
+    holidays: set[date] = field(default_factory=set)
 
     def get_task(self, task_id: str) -> Optional[Task]:
         for t in self.tasks:
@@ -273,6 +415,8 @@ class Project:
             "tasks": [t.to_dict() for t in self.tasks],
             "start_date": self.start_date.isoformat() if self.start_date else None,
             "created_at": self.created_at,
+            "default_work_weekdays": sorted(self.default_work_weekdays),
+            "holidays": sorted(d.isoformat() for d in self.holidays),
         }
 
     @classmethod
@@ -283,6 +427,8 @@ class Project:
             tasks=[Task.from_dict(t) for t in data.get("tasks", [])],
             start_date=date.fromisoformat(data["start_date"]) if data.get("start_date") else None,
             created_at=data.get("created_at", datetime.now().isoformat()),
+            default_work_weekdays=set(data["default_work_weekdays"]) if "default_work_weekdays" in data else {0, 1, 2, 3, 4},
+            holidays={date.fromisoformat(d) for d in data["holidays"]} if "holidays" in data else set(),
         )
 
     def save(self, path: Optional[str] = None) -> str:

@@ -182,3 +182,106 @@ class TestProject:
         t1.status = TaskStatus.COMPLETED
         project.update_blocked_status()
         assert t2.status == TaskStatus.NOT_STARTED
+
+
+class TestTaskWorkDays:
+    def test_work_days_default_empty(self):
+        task = Task(name="Test")
+        assert task.work_days == set()
+
+    def test_work_days_duration_computed(self):
+        task = Task(name="Test")
+        task.work_days = {date(2026, 3, 25), date(2026, 3, 26), date(2026, 3, 28)}
+        assert task.duration_days == 3
+
+    def test_work_days_start_end_computed(self):
+        task = Task(name="Test")
+        task.work_days = {date(2026, 3, 25), date(2026, 3, 26), date(2026, 3, 28)}
+        assert task.start_date == date(2026, 3, 25)
+        assert task.end_date == date(2026, 3, 28)
+
+    def test_work_days_empty_returns_none_dates(self):
+        task = Task(name="Test")
+        task.work_days = set()
+        assert task.start_date is None
+        assert task.end_date is None
+        assert task.duration_days == 0
+
+    def test_work_weekdays_default_none(self):
+        task = Task(name="Test")
+        assert task.work_weekdays is None
+
+    def test_manually_edited_default_false(self):
+        task = Task(name="Test")
+        assert task.manually_edited is False
+
+    def test_work_days_serialization(self):
+        task = Task(name="Test", wbs="1")
+        task.work_days = {date(2026, 3, 25), date(2026, 3, 26)}
+        task.work_weekdays = {5, 6}
+        task.manually_edited = True
+        data = task.to_dict()
+        assert data["work_days"] == ["2026-03-25", "2026-03-26"]
+        assert data["work_weekdays"] == [5, 6]
+        assert data["manually_edited"] is True
+
+    def test_work_days_deserialization(self):
+        data = {
+            "id": "abc",
+            "name": "Test",
+            "wbs": "1",
+            "work_days": ["2026-03-25", "2026-03-28"],
+            "work_weekdays": [5, 6],
+            "manually_edited": True,
+        }
+        task = Task.from_dict(data)
+        assert task.work_days == {date(2026, 3, 25), date(2026, 3, 28)}
+        assert task.work_weekdays == {5, 6}
+        assert task.manually_edited is True
+
+    def test_legacy_migration_no_work_days(self):
+        data = {
+            "id": "abc",
+            "name": "Test",
+            "wbs": "1",
+            "start_date": "2026-03-25",
+            "duration_days": 3,
+        }
+        task = Task.from_dict(data)
+        assert len(task.work_days) == 3
+        assert date(2026, 3, 25) in task.work_days
+
+
+class TestProjectCalendar:
+    def test_default_work_weekdays(self):
+        project = Project(name="Test")
+        assert project.default_work_weekdays == {0, 1, 2, 3, 4}
+
+    def test_holidays_default_empty(self):
+        project = Project(name="Test")
+        assert project.holidays == set()
+
+    def test_project_calendar_serialization(self):
+        project = Project(name="Test", start_date=date(2026, 1, 1))
+        project.holidays = {date(2026, 12, 25)}
+        project.default_work_weekdays = {0, 1, 2, 3}
+        data = project.to_dict()
+        assert data["default_work_weekdays"] == [0, 1, 2, 3]
+        assert data["holidays"] == ["2026-12-25"]
+
+    def test_project_calendar_deserialization(self):
+        data = {
+            "name": "Test",
+            "start_date": "2026-01-01",
+            "default_work_weekdays": [0, 1, 2, 3],
+            "holidays": ["2026-12-25"],
+        }
+        project = Project.from_dict(data)
+        assert project.default_work_weekdays == {0, 1, 2, 3}
+        assert project.holidays == {date(2026, 12, 25)}
+
+    def test_project_legacy_no_calendar_fields(self):
+        data = {"name": "Old Project", "start_date": "2026-01-01"}
+        project = Project.from_dict(data)
+        assert project.default_work_weekdays == {0, 1, 2, 3, 4}
+        assert project.holidays == set()
