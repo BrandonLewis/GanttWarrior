@@ -94,9 +94,11 @@ class SplashScreen(ModalScreen):
         yield Static(SPLASH_ART, id="splash-box")
 
     def on_key(self, event) -> None:
+        event.stop()
         self.dismiss()
 
     def on_click(self, event) -> None:
+        event.stop()
         self.dismiss()
 
 
