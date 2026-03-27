@@ -36,6 +36,69 @@ from .scheduler import Scheduler, SchedulerError
 from .views.gantt import GanttChart
 from .views.kanban import KanbanBoard
 
+SPLASH_ART = r"""
+[dim white]
+                          ___
+                         /   \
+                        |  o  |
+                        | --- |
+                         \_^_/
+                      .-'/ | \`-.
+                     /  /  |  \  \
+                    |  |  _|_  |  |
+                    |  | (___) |  |
+                     \  \ | | /  /
+                      '-.|_|_|.-'
+                     _/| \___/ |\_
+                    / /|  |||  |\ \
+                   | | |  |||  | | |
+                   | | |  |||  | | |
+                    \ \| ,===. |/ /
+                     '-(  / \  )-'
+                        | | | |
+                        | | | |
+                       _| | | |_
+                      (___) (___)
+[/dim white]
+[bold white]               *** GANTTWARRIOR ***[/bold white]
+
+[dim italic]  You stand at the threshold of a vast project.
+  Timelines stretch endlessly before you. Tasks loom
+  like ancient pillars in the mist. Dependencies coil
+  in the darkness. You grip your Gantt chart tightly
+  and step forward...[/dim italic]
+
+[bold dim]           >>> Press any key to begin <<<[/bold dim]
+"""
+
+
+class SplashScreen(ModalScreen):
+    """Intro splash screen - a gaunt warrior awaits."""
+
+    DEFAULT_CSS = """
+    SplashScreen {
+        align: center middle;
+        background: $background 90%;
+    }
+    #splash-box {
+        width: 60;
+        height: auto;
+        padding: 1 2;
+        border: heavy $primary;
+        background: $surface;
+        content-align: center middle;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        yield Static(SPLASH_ART, id="splash-box")
+
+    def on_key(self, event) -> None:
+        self.dismiss()
+
+    def on_click(self, event) -> None:
+        self.dismiss()
+
 
 class TaskEditScreen(ModalScreen[Optional[Task]]):
     """Modal dialog for adding/editing a task."""
@@ -501,6 +564,7 @@ class GanttWarriorApp(App):
     def on_mount(self) -> None:
         self._run_scheduler()
         self._update_status()
+        self.push_screen(SplashScreen())
 
     def _run_scheduler(self) -> None:
         if not self.project.tasks:
