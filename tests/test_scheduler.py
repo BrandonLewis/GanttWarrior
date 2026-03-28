@@ -177,3 +177,21 @@ class TestScheduler:
         assert len(critical) == 1
         assert critical[0].early_start == date(2026, 1, 5)
         assert critical[0].early_finish == date(2026, 1, 7)
+
+    def test_manually_edited_preserved(self):
+        project = Project(name="Test", start_date=date(2026, 1, 5))
+        t1 = project.add_task(Task(name="A", wbs="1", duration_days=5))
+        t1.work_days = {
+            date(2026, 1, 5), date(2026, 1, 6), date(2026, 1, 7),
+            date(2026, 1, 8), date(2026, 1, 9),
+        }
+        t1.manually_edited = True
+
+        scheduler = Scheduler(project)
+        scheduler.schedule(date(2026, 1, 5))
+
+        # work_days should not be overwritten
+        assert t1.work_days == {
+            date(2026, 1, 5), date(2026, 1, 6), date(2026, 1, 7),
+            date(2026, 1, 8), date(2026, 1, 9),
+        }

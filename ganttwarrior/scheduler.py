@@ -126,8 +126,9 @@ class Scheduler:
             task.early_finish = earliest + timedelta(days=max(task.duration_days - 1, 0))
 
             # Update the task's actual dates
-            task.start_date = task.early_start
-            task.end_date = task.early_finish
+            if not task.manually_edited:
+                task.start_date = task.early_start
+                task.end_date = task.early_finish
 
     def backward_pass(self) -> None:
         """Calculate late start, late finish, and float for all tasks."""

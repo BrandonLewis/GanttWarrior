@@ -369,6 +369,13 @@ class Project:
         if not task.start_date:
             task.start_date = self.start_date or date.today()
         task.compute_end_date()
+
+        # Populate work_days from duration if not already set
+        if not task.work_days and task.start_date and task.duration_days > 0:
+            from .work_calendar import WorkCalendar
+            cal = WorkCalendar(self)
+            task.work_days = cal.expand_duration(task.start_date, task.duration_days, task)
+
         self.tasks.append(task)
         return task
 
