@@ -350,6 +350,56 @@ class ExportScreen(ModalScreen[None]):
         self.dismiss(None)
 
 
+class LoadScreen(ModalScreen[Optional[str]]):
+    """Modal for loading a project file."""
+
+    DEFAULT_CSS = """
+    LoadScreen {
+        align: center middle;
+    }
+    #load-dialog {
+        width: 50;
+        height: auto;
+        padding: 1 2;
+        border: thick $accent;
+        background: $surface;
+    }
+    #load-buttons {
+        margin-top: 1;
+        height: 3;
+        align: center middle;
+    }
+    #load-buttons Button {
+        margin: 0 2;
+    }
+    """
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="load-dialog"):
+            yield Label("[bold]Open Project (.gw.json)[/bold]")
+            yield Label("File path:")
+            yield Input(id="load-path", placeholder="/path/to/project.gw.json")
+
+            with Horizontal(id="load-buttons"):
+                yield Button("Open", variant="primary", id="load-btn")
+                yield Button("Cancel", variant="default", id="load-cancel-btn")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "load-btn":
+            path = self.query_one("#load-path", Input).value.strip()
+            if path and Path(path).exists():
+                self.dismiss(path)
+            else:
+                self.notify("File not found", severity="error")
+        else:
+            self.dismiss(None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class ImportScreen(ModalScreen[Optional[str]]):
     """Modal for importing a calendar file."""
 
@@ -466,6 +516,7 @@ class GanttWarriorApp(App):
         Binding("x", "export", "Export"),
         Binding("i", "import_cal", "Import"),
         Binding("s", "save_project", "Save"),
+        Binding("o", "load_project", "Open"),
         Binding("p", "print_project", "Print"),
         Binding("q", "quit", "Quit"),
         Binding("1", "show_gantt", "Gantt"),
@@ -655,6 +706,19 @@ class GanttWarriorApp(App):
                     self.notify(f"Import failed: {e}", severity="error")
 
         self.push_screen(ImportScreen(), on_result)
+
+    def action_load_project(self) -> None:
+        def on_result(path: Optional[str]) -> None:
+            if path:
+                try:
+                    self.project = Project.load(path)
+                    self.editor = GridEditor(self.project)
+                    self._refresh_views()
+                    self.notify(f"Opened {path}")
+                except Exception as e:
+                    self.notify(f"Load failed: {e}", severity="error")
+
+        self.push_screen(LoadScreen(), on_result)
 
     def action_save_project(self) -> None:
         try:

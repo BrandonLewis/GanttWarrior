@@ -14,7 +14,8 @@ from textual.containers import Horizontal, Vertical, ScrollableContainer
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
-from textual.widgets import Static, Label
+from textual.widgets import Static, Label, TabbedContent
+from textual.widgets._tabs import Tabs
 
 from ..grid_editor import GridEditor
 from ..models import Project, Task, TaskColor, TaskStatus
@@ -253,7 +254,9 @@ class GanttChart(ScrollableContainer):
         Binding("ctrl+x", "cut_cells", "Cut", show=False),
         Binding("ctrl+v", "paste_cells", "Paste", show=False),
         Binding("shift+insert", "paste_cells", "Paste", show=False),
+        Binding("p", "paste_cells", "Paste"),
         Binding("ctrl+shift+v", "paste_new_task", "Paste New", show=False),
+        Binding("P", "paste_new_task", "Paste New", show=False),
         Binding("ctrl+z", "undo_edit", "Undo", show=False),
         Binding("ctrl+y", "redo_edit", "Redo", show=False),
         Binding("ctrl+k", "split_task", "Split", show=False),
@@ -335,6 +338,11 @@ class GanttChart(ScrollableContainer):
     # Helpers
     # ------------------------------------------------------------------
 
+    @property
+    def grid_active(self) -> bool:
+        """True when the day-cursor is visible and grid editing keys are active."""
+        return self.cursor_col is not None
+
     def _ensure_cursor(self) -> None:
         """Initialize cursor_col if not yet set."""
         if self.cursor_col is None:
@@ -378,6 +386,30 @@ class GanttChart(ScrollableContainer):
         if self._task_rows and 0 <= self.selected_index < len(self._task_rows):
             return self._task_rows[self.selected_index]
         return None
+
+    # ------------------------------------------------------------------
+    # Grid activation / deactivation
+    # ------------------------------------------------------------------
+
+    def on_key(self, event) -> None:
+        """Handle Escape to bubble up focus hierarchy.
+
+        Grid cursor active → deactivate cursor (task list browsing)
+        Cursor inactive → move focus to Tabs bar (tab switching with arrow keys)
+        """
+        if event.key == "escape":
+            if self.grid_active:
+                self.cursor_col = None
+                self._clear_selection()
+                self._refresh_all_rows()
+            else:
+                # Focus the Tabs widget inside TabbedContent
+                try:
+                    tabs = self.app.query_one(Tabs)
+                    tabs.focus()
+                except Exception:
+                    pass
+            event.stop()
 
     # ------------------------------------------------------------------
     # Navigation actions

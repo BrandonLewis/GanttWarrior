@@ -20,6 +20,7 @@ class Clipboard:
 
     offsets: list[int]  # Relative day offsets that have work
     source_task_name: str
+    from_cut: bool = False  # True if this was a cut (single-use paste)
 
 
 class GridEditor:
@@ -132,8 +133,9 @@ class GridEditor:
         self.clipboard = Clipboard(offsets=offsets, source_task_name=task.name)
 
     def cut(self, task: Task, start: date, end: date) -> None:
-        """Copy then erase_range."""
+        """Copy then erase_range. Clipboard is single-use (cleared after paste)."""
         self.copy(task, start, end)
+        self.clipboard.from_cut = True
         self.erase_range(task, start, end)
 
     def paste(self, task: Task, cursor_date: date) -> None:
@@ -148,6 +150,8 @@ class GridEditor:
         self._push_undo(
             [task.id], before, after, f"Paste onto {task.name} at {cursor_date}"
         )
+        if self.clipboard.from_cut:
+            self.clipboard = None
 
     def paste_as_new_task(self, cursor_date: date, after_task: Task) -> Task:
         """Create new task from clipboard, insert after after_task in project.tasks."""
@@ -169,6 +173,9 @@ class GridEditor:
         # Insert after after_task in project.tasks
         idx = self.project.tasks.index(after_task)
         self.project.tasks.insert(idx + 1, new_task)
+
+        if self.clipboard.from_cut:
+            self.clipboard = None
 
         return new_task
 
