@@ -177,6 +177,16 @@ def import_ical(path: str, project: Optional[Project] = None) -> Project:
             priority=int(priority_str),
             is_milestone=is_milestone,
         )
+
+        # Populate work_days from the computed dates
+        if start_date and end_date:
+            task.work_days = set()
+            current = start_date
+            while current <= end_date:
+                if current.weekday() < 5:  # Default Mon-Fri
+                    task.work_days.add(current)
+                current += timedelta(days=1)
+
         project.tasks.append(task)
         color_index += 1
 
