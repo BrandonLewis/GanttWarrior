@@ -24,6 +24,7 @@ from textual.widgets import (
 )
 from textual.widgets.option_list import Option
 
+from .grid_editor import GridEditor
 from .models import (
     Dependency,
     DependencyType,
@@ -484,13 +485,14 @@ class GanttWarriorApp(App):
             )
             if file_path:
                 self.project.file_path = file_path
+        self.editor = GridEditor(self.project)
 
     def compose(self) -> ComposeResult:
         yield Header()
 
         with TabbedContent(id="main-content"):
             with TabPane("Gantt Chart", id="gantt-tab"):
-                yield GanttChart(self.project, id="gantt-chart")
+                yield GanttChart(self.project, self.editor, id="gantt-chart")
             with TabPane("Kanban Board", id="kanban-tab"):
                 yield KanbanBoard(self.project, id="kanban-board")
 
@@ -536,12 +538,29 @@ class GanttWarriorApp(App):
             for d in task.dependencies
         ) if task.dependencies else "None"
 
+        # Cursor context info
+        gantt = self.query_one("#gantt-chart", GanttChart)
+        cursor_info = ""
+        if gantt.cursor_col:
+            cursor_date = gantt.cursor_col
+            is_filled = cursor_date in task.work_days
+            # Count gaps: work days in bar span that are not filled
+            gap_count = 0
+            if task.start_date and task.end_date:
+                d = task.start_date
+                while d <= task.end_date:
+                    if d not in task.work_days and d.weekday() < 5:
+                        gap_count += 1
+                    d += timedelta(days=1)
+            cell_state = "Filled" if is_filled else "Empty"
+            cursor_info = f" │ Cursor: {cursor_date} ({cell_state}) │ Gaps: {gap_count}"
+
         info = (
             f"[bold]{task.wbs}[/bold] {task.name}\n"
             f"Status: {task.status.value} │ Duration: {task.duration_days}d │ "
             f"Progress: {int(task.progress * 100)}% │ Priority: {task.priority}\n"
             f"Start: {task.start_date} │ End: {task.end_date} │ "
-            f"Float: {task.total_float}d │ Critical: {'Yes' if task.is_critical else 'No'}\n"
+            f"Float: {task.total_float}d │ Critical: {'Yes' if task.is_critical else 'No'}{cursor_info}\n"
             f"Assigned: {task.assigned_to or '-'} │ Dependencies: {deps}"
         )
         panel.update(info)
@@ -640,6 +659,7 @@ class GanttWarriorApp(App):
     def action_save_project(self) -> None:
         try:
             path = self.project.save()
+            self.editor.undo_stack.clear()
             self.notify(f"Saved to {path}")
         except Exception as e:
             self.notify(f"Save failed: {e}", severity="error")
